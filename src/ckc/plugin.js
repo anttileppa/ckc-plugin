@@ -1,6 +1,6 @@
 /*
  * Collaboration plugin for CKEditor
- * Copyright (C) 2012 Antti Leppä / Foyt
+ * Copyright (C) 2012 Antti Lepp√§ / Foyt
  * http://www.foyt.fi
  * 
  * License: 
@@ -37,10 +37,10 @@
     $: function() { },
     proto: {
       getValue: function (editor) {
-        return editor.document.getElementsByTag( 'title' ).getItem( 0 ).data( 'cke-title' );
+        return editor.document.getElementsByTag('title').getItem(0).data('cke-title');
       },
       setValue: function (editor, value) {
-        editor.document.getElementsByTag( 'title' ).getItem( 0 ).data( 'cke-title', value );
+        editor.document.getElementsByTag('title').getItem(0).data('cke-title', value);
       },
       getName: function () {
         return 'title';
@@ -102,7 +102,7 @@
     $: function() { },
     proto: {
       getValue: function (editor) {
-        var metas = editor.document.getHead().getElementsByTag( 'meta' );
+        var metas = editor.document.getHead().getElementsByTag('meta');
         for ( var i = 0, l = metas.count(); i < l; i++ ) {
           var meta = metas.getItem(i);
           if (meta.getAttribute('http-equiv') == "content-type") {
@@ -117,7 +117,7 @@
       setValue: function (editor, value) {
         var content = value ? "text/html; charset=" + value : null;
         
-        var metas = editor.document.getHead().getElementsByTag( 'meta' );
+        var metas = editor.document.getHead().getElementsByTag('meta');
         for ( var i = 0, l = metas.count(); i < l; i++ ) {
           var meta = metas.getItem(i);
           if (meta.getAttribute('http-equiv') == "content-type") {
@@ -165,11 +165,11 @@
     $: function() { },
     proto: {
       getValue: function (editor) {
-        return editor.document.getBody().getComputedStyle( 'color' );
+        return editor.document.getBody().getComputedStyle('color');
       },
       setValue: function (editor, value) {
         var body = editor.document.getBody();
-        body.removeAttribute( 'text' );
+        body.removeAttribute('text');
         if (value)
           body.setStyle('color', value);
         else
@@ -186,13 +186,13 @@
     $: function() { },
     proto: {
       getValue: function (editor) {
-        return editor.document.getBody().getComputedStyle( 'background-color' );
+        return editor.document.getBody().getComputedStyle('background-color');
       },
       setValue: function (editor, value) {
         var body = editor.document.getBody();
-        body.removeAttribute( 'bgcolor' );
+        body.removeAttribute('bgcolor');
         if (value) {
-          body.setStyle( 'background-color', value);
+          body.setStyle('background-color', value);
         } else {
           body.removeStyle('background-color');
         }
@@ -208,13 +208,13 @@
     $: function() { },
     proto: {
       getValue: function (editor) {
-        return editor.document.getBody().getComputedStyle( 'background-image' );
+        return editor.document.getBody().getComputedStyle('background-image');
       },
       setValue: function (editor, value) {
         var body = editor.document.getBody();
-        body.removeAttribute( 'bgcolor' );
+        body.removeAttribute('bgcolor');
         if (value) {
-          body.setStyle( 'background-image', value);
+          body.setStyle('background-image', value);
         } else {
           body.removeStyle('background-image');
         }
@@ -230,12 +230,12 @@
     $: function() { },
     proto: {
       getValue: function (editor) {
-        return editor.document.getBody().getComputedStyle( 'background-attachment' );
+        return editor.document.getBody().getComputedStyle('background-attachment');
       },
       setValue: function (editor, value) {
         var body = editor.document.getBody();
         if (value) {
-          body.setStyle( 'background-attachment', value);
+          body.setStyle('background-attachment', value);
         } else {
           body.removeStyle('background-attachment');
         }
@@ -255,7 +255,7 @@
     proto: {
       getValue: function (editor) {
         var body = editor.document.getBody();
-        return body.getStyle( 'margin-' + this._property ) || body.getAttribute( 'margin' + this._property );
+        return body.getStyle('margin-' + this._property ) || body.getAttribute('margin' + this._property );
       },
       setValue: function (editor, value) {
         var body = editor.document.getBody();
@@ -342,6 +342,7 @@
   var messageHandler = null;
   var lang = null;
   var instanceDestroyed = false;
+  var pollingPaused = false;
   
   /**
    * Returns document's id
@@ -478,10 +479,9 @@
      * 
      * @param url requets url
      * @param data request data (raw)
-     * @param onSuccess method to be executed on successful request
-     * @param onFailure method to be executed on unsuccessful request
+     * @param callback method to be executed after the call. 
      */
-    _doPost: function (url, data, onSuccess, onFailure) {
+    _doPost: function (url, data, callback) {
       var xhr = this.createXMLHttpRequest();
       xhr.open("POST", url, true);
       xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
@@ -506,20 +506,26 @@
             
             try {
               var responseJson = eval("(" + response + ")");
-              if ((typeof onSuccess) == 'function')
-                onSuccess(responseJson);
+              if ((typeof callback) == 'function')
+                callback(true, responseJson);
             } catch (e)  {
               displayMessage('SEVERE', lang.couldNotParseServerResponse);
             }
           } else {
-            if ((typeof onFailure) == 'function')
-              onFailure(xhr.responseText);
-            else {
+            if ((typeof callback) == 'function') {
+              var message = xhr.responseText;
               if (xhr.status == 403) {
                 displayMessage('SEVERE', lang.permissionDenied);
-              } else {
-                displayMessage('SEVERE', lang.unknownServerError);
+              } 
+              
+              if (!message) {
+                message = lang.unknownServerError;
               }
+
+              callback(false, {
+                errorMessage: message,
+                errorCode: xhr.status
+              });
             }
           }
         }
@@ -536,35 +542,43 @@
     init: function (editor, callback) {
       var id = getDocumentId();
       
-      this._doPost(connectorUrl + '?action=INIT&documentId=' + id, null, function (responseJson) {
-        if (responseJson.status == "OK") {
-          setToken(responseJson.token);
-          
-          if ((typeof callback) == 'function') {
-            callback();
-          }
-        } else {
+      this._doPost(connectorUrl + '?action=INIT&documentId=' + id, null, function (success, responseJson) {
+        if (!success) {
           displayMessage('SEVERE', lang.initializationError);
+        } else {
+          if (responseJson.status == "OK") {
+            setToken(responseJson.token);
+            
+            if ((typeof callback) == 'function') {
+              callback();
+            }
+          } else {
+            displayMessage('SEVERE', lang.initializationError);
+          }
         }
       });
     },
     createDocument: function (editor, callback) {
       var content = getCurrentContent(editor);
       
-      this._doPost(connectorUrl + "?action=CREATE&content=" + content, null, function (responseJson) {
-        switch (responseJson.status) {
-          case "OK":
-            updateSavedContent(content);
-            updateDocumentId(responseJson.documentId);
-            updateSavedRevision(responseJson.revisionNumber);
-            setToken(responseJson.token);
-
-            if ((typeof callback) == 'function')
-              callback();
-          break;
-          default:
-            displayMessage('SEVERE', lang.unknownServerError);
-          break;
+      this._doPost(connectorUrl + "?action=CREATE&content=" + content, null, function (success, responseJson) {
+        if (!success) {
+          displayMessage('SEVERE', lang.documentCreateError);
+        } else {        
+          switch (responseJson.status) {
+            case "OK":
+              updateSavedContent(content);
+              updateDocumentId(responseJson.documentId);
+              updateSavedRevision(responseJson.revisionNumber);
+              setToken(responseJson.token);
+  
+              if ((typeof callback) == 'function')
+                callback();
+            break;
+            default:
+              displayMessage('SEVERE', lang.unknownServerError);
+            break;
+          }
         }
       });
     },
@@ -578,70 +592,83 @@
     checkUpdates: function (editor, callback) {
       var id = getDocumentId();
       
-      this._doPost(connectorUrl + '?action=UPDATE&documentId=' + id + "&revisionNumber=" + getSavedRevision(), null, function (responseJson) {
-        switch (responseJson.status) {
-          case "OK":
-            var revisions = responseJson.revisions;
-            if (revisions && revisions.length > 0) {
-              var text = getCurrentContent(editor);
-              var revisionNumber = getSavedRevision();
-              var patchedText = text;
-              
-              for (var i = 0, l = revisions.length; i < l; i++) {
-                var revision = revisions[i];
-                if (revision.patch) {
-                  var patchResult = applyPatch(revision.patch, patchedText);
-                  if (patchResult.applied) {
-                    patchedText = patchResult.patchedText;
-                  } else {
-                    displayMessage('WARNING', lang.conflictWhileApplyingUpdates);
-                    break;
-                  }
-                }
+      this._doPost(connectorUrl + '?action=UPDATE&documentId=' + id + "&revisionNumber=" + getSavedRevision(), null, function (success, responseJson) {
+        if (!success) {
+          displayMessage('SEVERE', responseJson.errorMessage);
+          if ((typeof callback) == 'function') {
+            callback();
+          }
+        } else {        
+          switch (responseJson.status) {
+            case "OK":
+              var revisions = responseJson.revisions;
+              if (revisions && revisions.length > 0) {
+                var text = getCurrentContent(editor);
+                var revisionNumber = getSavedRevision();
+                var patchedText = text;
+                var conflict = false;
                 
-                if (revision.properties) {
-                  var changedProperties = new Array();
-                  for (var i = 0, l = revision.properties.length; i < l; i++) {
-                    updateCurrentProperty(editor, revision.properties[i].name, revision.properties[i].value);
-                    changedProperties.push({
-                      name: revision.properties[i].name,
-                      value: revision.properties[i].value
+                for (var i = 0, l = revisions.length; i < l; i++) {
+                  var revision = revisions[i];
+                  if (revision.patch) {
+                    var patchResult = applyPatch(revision.patch, patchedText);
+                    if (patchResult.applied) {
+                      patchedText = patchResult.patchedText;
+                    } else {
+                      displayMessage('WARNING', lang.conflictWhileApplyingUpdates);
+                      conflict = true;
+                      break;
+                    }
+                  }
+                  
+                  if (revision.properties) {
+                    var changedProperties = new Array();
+                    for (var i = 0, l = revision.properties.length; i < l; i++) {
+                      updateCurrentProperty(editor, revision.properties[i].name, revision.properties[i].value);
+                      changedProperties.push({
+                        name: revision.properties[i].name,
+                        value: revision.properties[i].value
+                      });
+                    }
+                    
+                    updateSavedProperties(getCurrentProperties(editor));
+                    
+                    editor.fire('ckcPropertiesChanged', {
+                      changedProperties: changedProperties,
+                      source: "remote"
                     });
                   }
                   
-                  updateSavedProperties(getCurrentProperties(editor));
-                  
-                  editor.fire('ckcPropertiesChanged', {
-                    changedProperties: changedProperties,
-                    source: "remote"
-                  });
+                  revisionNumber = revision.number;
                 }
                 
-                revisionNumber = revision.number;
+                if (conflict == false) {
+                  updateSavedRevision(revisionNumber);
+    
+                  if (patchedText !== text) {
+                    updateSavedContent(patchedText);
+                    updateCurrentContent(editor, patchedText);
+                    editor.fire('ckcContentChanged', {
+                      source: "remote"
+                    });
+                  }
+                } else {
+                  revert(editor);
+                }
               }
-              
-              updateSavedRevision(revisionNumber);
-
-              if (patchedText !== text) {
-                updateSavedContent(patchedText);
-                updateCurrentContent(editor, patchedText);
-                editor.fire('ckcContentChanged', {
-                  source: "remote"
-                });
-              }
-            }
-          break;
-          case "CONFLICT":
-            displayMessage('WARNING', lang.conflictWhileApplyingUpdates);
-            updateCurrentContent(editor, getSavedContent());
-          break;
-          default:
-            displayMessage('SEVERE', lang.unknownServerError);
-          break;
+            break;
+            case "CONFLICT":
+              displayMessage('WARNING', lang.conflictWhileApplyingUpdates);
+              revert(editor);
+            break;
+            default:
+              displayMessage('SEVERE', lang.unknownServerError);
+            break;
+          }
+  
+          if ((typeof callback) == 'function')
+            callback();
         }
-
-        if ((typeof callback) == 'function')
-          callback();
       });
     },
     /**
@@ -681,50 +708,58 @@
         }
         
         if (contentDirty||propertiesDirty) {
-          this._doPost(connectorUrl + '?action=SAVE&documentId=' + id + "&revision=" + getSavedRevision(), data, function (responseJson) {
-            switch (responseJson.status) {
-              case "OK":
-                if (responseJson.revisionNumber) {
-                  if (contentDirty) {
-                    updateSavedContent(snapshot);
-                    editor.fire('ckcContentChanged', {
-                      source: "local"
-                    });
-                  }
-                  
-                  if (propertiesDirty) {
-                    updateSavedProperties(properties);
-                    
-                    var changedProperties = new Array();
-                    
-                    for (var property in propertiesDiff) {
-                      changedProperties.push({
-                        name: property,
-                        value: propertiesDiff[property]
+          this._doPost(connectorUrl + '?action=SAVE&documentId=' + id + "&revision=" + getSavedRevision(), data, function (success, responseJson) {
+            if (!success) {
+              displayMessage('SEVERE', responseJson.errorMessage);
+              if ((typeof callback) == 'function') {
+                callback();
+              }
+            } else {    
+              switch (responseJson.status) {
+                case "OK":
+                  if (responseJson.revisionNumber) {
+                    if (contentDirty) {
+                      updateSavedContent(snapshot);
+                      editor.fire('ckcContentChanged', {
+                        source: "local"
                       });
                     }
                     
-                    editor.fire('ckcPropertiesChanged', {
-                      changedProperties: changedProperties,
-                      source: "local"
-                    });
+                    if (propertiesDirty) {
+                      updateSavedProperties(properties);
+                      
+                      var changedProperties = new Array();
+                      
+                      for (var property in propertiesDiff) {
+                        changedProperties.push({
+                          name: property,
+                          value: propertiesDiff[property]
+                        });
+                      }
+                      
+                      editor.fire('ckcPropertiesChanged', {
+                        changedProperties: changedProperties,
+                        source: "local"
+                      });
+                    }
+                    updateSavedRevision(responseJson.revisionNumber);
                   }
-                  updateSavedRevision(responseJson.revisionNumber);
-                }
-              break;
-              case "CONFLICT":
-                displayMessage('WARNING', lang.conflictWhileApplyingUpdates);
-                updateCurrentContent(editor, original);
-              break;
-              default:
-                displayMessage('SEVERE', lang.unknownServerError);
-              break;
+                break;
+                case "CONFLICT":
+                  displayMessage('WARNING', lang.conflictWhileApplyingUpdates);
+                  revert(editor);
+  //                updateCurrentContent(editor, original);
+                break;
+                default:
+                  displayMessage('SEVERE', lang.unknownServerError);
+                break;
+              }
+              
+              editor.resetDirty();
+              
+              if ((typeof callback) == 'function')
+                callback();
             }
-            
-            editor.resetDirty();
-            
-            if ((typeof callback) == 'function')
-              callback();
           });
         } else {
           if ((typeof callback) == 'function')
@@ -734,6 +769,51 @@
         if ((typeof callback) == 'function')
           callback();
       }
+    },
+    loadDocument: function (editor, callback) {
+      var id = getDocumentId();
+      
+      this._doPost(connectorUrl + '?action=LOAD&documentId=' + id, null, function (success, responseJson) {
+        if (!success) {
+          displayMessage('SEVERE', responseJson.errorMessage);
+          if ((typeof callback) == 'function') {
+            callback();
+          }
+        } else {
+          if (getSavedContent() != responseJson.content) {
+            updateCurrentContent(editor, responseJson.content);
+            updateSavedContent(responseJson.content);
+            editor.fire('ckcContentChanged', {
+              source: "remote"
+            });
+          }
+          
+          if (responseJson.properties && (responseJson.properties.length > 0)) {
+            
+            var changedProperties = new Array();
+            for (var i = 0, l = responseJson.properties.length; i < l; i++) {
+              updateCurrentProperty(editor, responseJson.properties[i].name, responseJson.properties[i].value);
+              changedProperties.push({
+                name: responseJson.properties[i].name,
+                value: responseJson.properties[i].value
+              });
+            }
+  
+            updateSavedProperties(getCurrentProperties(editor));
+            
+            editor.fire('ckcPropertiesChanged', {
+              changedProperties: changedProperties,
+              source: "remote"
+            });
+          }
+          
+          updateSavedRevision(responseJson.revisionNumber);
+          
+          if ((typeof callback) == 'function') {
+            callback();
+          }
+        }
+      });
     }
   };
   
@@ -869,6 +949,13 @@
     }
   }
   
+  function revert(editor) {
+    pollingPaused = true;
+    CKCConnector.loadDocument(editor, function () {
+      pollingPaused = false;
+    });
+  }
+  
   /**
    * Scheduled task for periodically checking updates
    */
@@ -876,9 +963,11 @@
     CKEDITOR.tools.setTimeout(function () {
       if (instanceDestroyed == false) {
         if (editor.mode == 'wysiwyg') {
-          save(editor, function () {
-            checkUpdates(editor);
-          });
+          if (pollingPaused == false) {
+            save(editor, function () {
+              checkUpdates(editor);
+            });
+          }
         } else {
           checkUpdates(editor);
         }
@@ -920,9 +1009,19 @@
           updateSavedContent(getCurrentContent(editor));
           updateSavedProperties(getCurrentProperties(editor));
           
-          editor.addCommand('fnisave', {
+          editor.addCommand('ckcsave', {
             exec : function(editor) {
               save(editor);
+            }
+          });
+          
+          editor.addCommand('ckcrevert', {
+            exec : function(editor) {
+              if (editor.mode == 'wysiwyg') {
+                revert(editor);
+              } else {
+                displayMessage('WARNING', lang.cannotRevertDocumentNotWysiwygMode);
+              }
             }
           });
           
@@ -942,10 +1041,15 @@
         });
       });
 
-      editor.ui.addButton('FNISave', {
+      editor.ui.addButton('CKCSave', {
         label : lang.saveButtonTooltip,
-        command : 'fnisave'
+        command : 'ckcsave'
       });
-    }
+
+      editor.ui.addButton('CKCRevert', {
+        label : lang.revertButtonTooltip,
+        command : 'ckcrevert'
+      });
+}
   });
 })();
