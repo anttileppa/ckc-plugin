@@ -1006,10 +1006,7 @@
           messageHandler = editor.config.ckc.messageHandler;
           
           updateDocumentId(editor.config.ckc.documentId);
-          updateSavedRevision(editor.config.ckc.originalRevision);
-          updateSavedContent(getCurrentContent(editor));
-          updateSavedProperties(getCurrentProperties(editor));
-          
+
           editor.addCommand('ckcsave', {
             exec : function(editor) {
               save(editor);
@@ -1032,7 +1029,9 @@
           
           if (getDocumentId()) {
             CKCConnector.init(editor, function () {
-              checkUpdates(editor);
+              CKCConnector.loadDocument(editor, function () {
+                checkUpdates(editor);
+              });
             });
           }
           
