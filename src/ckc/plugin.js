@@ -559,9 +559,10 @@
       });
     },
     createDocument: function (editor, callback) {
-      var content = getCurrentContent(editor);
+      var content = encodeURIComponent(getCurrentContent(editor));
+      var properties = encodeURIComponent(hashSerialize(getCurrentProperties(editor)));
       
-      this._doPost(connectorUrl + "?action=CREATE&content=" + content, null, function (success, responseJson) {
+      this._doPost(connectorUrl + "?action=CREATE&content=" + content + '&properties=' + properties, null, function (success, responseJson) {
         if (!success) {
           displayMessage('SEVERE', lang.documentCreateError);
         } else {        
