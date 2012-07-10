@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="ckc-plugin" default="archives">
+	
+  <description>Build file for ckc-plugin</description>
+  <property name="project" value="ckc" />
+  <property name="archive" value="ckc-plugin" />
+  <property name="version" value="0.0.3" />
+  <property name="jsdocoutputdir" value="docs/apidocs"/>
+	
+  <taskdef name="jsdoctoolkit" classname="uk.co.darrenhurley.ant.tasks.JsDocToolkit">
+    <classpath path="${jsdoc-toolkit-ant-task}"></classpath>
+    <classpath path="${jsdoc-home}/java/classes/js.jar"></classpath>
+  	
+  </taskdef>
+
+  <target name="jsdoc" description="Generates jsdoc files">
+	<jsdoctoolkit jsdochome="${jsdoc-home}/" template="jsdoc" outputdir="${jsdocoutputdir}" inputdir="src"/>
+  </target>
+	
+  <target name="build">
+  	<delete dir="dist"/>
+  	<mkdir dir="dist"/>
+  	<mkdir dir="dist/ckc"/>
+  	<mkdir dir="dist/ckc/lang"/>
+  	<mkdir dir="dist/ckc/required"/>
+  		
+    <java jar="${yuicompressor-jar}" fork="true">
+  	  <arg value="src/ckc/plugin.js"/>
+  	  <arg value="-o"/>
+  	  <arg value="dist/ckc/plugin.js"/>
+    </java>
+		
+	<java jar="${yuicompressor-jar}" fork="true">
+	  <arg value="src/ckc/lang/en.js"/>
+	  <arg value="-o"/>
+	  <arg value="dist/ckc/lang/en.js"/>
+	</java>
+	
+	<java jar="${yuicompressor-jar}" fork="true">
+	  <arg value="src/ckc/lang/fi.js"/>
+	  <arg value="-o"/>
+	  <arg value="dist/ckc/lang/fi.js"/>
+	</java>
+  	
+  	<copy file="src/ckc/required/diff_match_patch.js" todir="dist/ckc/required/"/>
+  </target>
+
+  <target name="archives" depends="build">
+    <delete dir="archives"/>
+    
+    <mkdir dir="archives"/>
+    <mkdir dir="archives/${project}"/>
+    <mkdir dir="archives/${project}/lang"/>
+    <mkdir dir="archives/${project}/required"/>
+    
+    <copy todir="archives/${project}/"> 
+      <fileset dir="dist/ckc" includes="*.js"/>
+    </copy>
+    
+    <copy todir="archives/${project}/lang/"> 
+      <fileset dir="dist/ckc/lang" includes="*.js"/>
+    </copy>
+    
+    <copy todir="archives/${project}/required/"> 
+      <fileset dir="dist/ckc/required" includes="*.js"/>
+    </copy>
+  	
+    <tar destfile="archives/${archive}-${version}.tar" basedir="archives/${project}"></tar>
+    <gzip src="archives/${archive}-${version}.tar" destfile="archives/${archive}-${version}.tar.gz"/>
+    <bzip2 src="archives/${archive}-${version}.tar" destfile="archives/${archive}-${version}.tar.bz2"/>
+    <delete file="archives/${archive}-${version}.tar"></delete>
+  	<zip destfile="archives/${archive}-${version}.zip" basedir="archives/${project}"></zip>
+  	<delete dir="archives/${project}"/>
+
+  	<tar destfile="archives/${archive}-${version}-src.tar" basedir="src/${project}"></tar>
+    <gzip src="archives/${archive}-${version}-src.tar" destfile="archives/${archive}-${version}-src.tar.gz"/>
+    <bzip2 src="archives/${archive}-${version}-src.tar" destfile="archives/${archive}-${version}-src.tar.bz2"/>
+    <delete file="archives/${archive}-${version}-src.tar"></delete>
+  	<zip destfile="archives/${archive}-${version}-src.zip" basedir="src/${project}"></zip>
+	    
+	
+
+<!--
+    <copy todir="archives/full/${project}/docs" includeemptydirs="true" > 
+      <fileset dir="docs">
+      </fileset>
+    </copy>
+
+    <copy todir="archives/full/${project}/src" includeemptydirs="true" > 
+      <fileset dir="src">
+      </fileset>
+    </copy>
+    
+    <zip destfile="archives/${archive}-${version}.zip" basedir="archives/dist/${project}"></zip>
+    
+    <tar destfile="archives/${archive}-${version}-src.tar" basedir="archives/full/${project}"></tar>
+    <gzip src="archives/${archive}-${version}-src.tar" destfile="archives/${project}-${version}-src.tar.gz"/>
+    <bzip2 src="archives/${archive}-${version}-src.tar" destfile="archives/${project}-${version}-src.tar.bz2"/>
+    <delete file="archives/${archive}-${version}-src.tar"></delete>
+    <zip destfile="archives/${archive}-${version}-src.zip" basedir="archives/full/${project}"></zip>
+    
+    <delete dir="archives/full"/>
+    -->
+  </target>
+
+</project>
+
+
