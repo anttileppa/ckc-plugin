@@ -17,15 +17,39 @@
     }
   };
   
+  /**
+   * Base class for all CKC property handlers
+   * @class 
+   */
   CKEDITOR.plugins.ckc.PropertyHandler = CKEDITOR.tools.createClass({
+    /**
+     * @constructor
+     */
     $: function() { },
     proto: {
+      /**
+       * Returns property value 
+       * 
+       * @param editor CKEditor instance
+       * @returns property value
+       */
       getValue: function (editor) {
         alert('not implemented');
       },
+      /**
+       * Sets new property value
+       * 
+       * @param editor CKEditor instance
+       * @param value new value
+       */
       setValue: function (editor, value) {
         alert('not implemented');
       },
+      /**
+       * Returns name of the property handler. This name should be unique because it's used to identify property handler.
+       * 
+       * @returns name of the property handler.
+       */
       getName: function () {
         alert('not implemented');
       }
