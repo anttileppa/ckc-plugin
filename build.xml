@@ -4,7 +4,7 @@
   <description>Build file for ckc-plugin</description>
   <property name="project" value="ckc" />
   <property name="archive" value="ckc-plugin" />
-  <property name="version" value="0.0.4-SNAPSHOT" />
+  <property name="version" value="0.0.4" />
   <property name="jsdocoutputdir" value="docs/apidocs"/>
 	
   <taskdef name="jsdoctoolkit" classname="uk.co.darrenhurley.ant.tasks.JsDocToolkit">
