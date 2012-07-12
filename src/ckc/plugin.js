@@ -522,6 +522,9 @@
       xhr.onreadystatechange = function() { 
         if(xhr.readyState == 4) {
           if (xhr.status == 200) {
+            if (instanceDestroyed == true)
+              return;
+            
             var response = xhr.responseText;
             if (!response) {
               // Request was probably aborted...
