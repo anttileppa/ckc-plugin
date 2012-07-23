@@ -358,56 +358,63 @@
    */
   var connectorUrl = null;
   var diffMatchPatch = null;
-  var documentId = null;
-  var savedRevision = null;
-  var savedContent = null;
-  var savedProperties = null;
-  var token = null;
-  var messageHandler = null;
   var lang = null;
-  var instanceDestroyed = false;
-  var pollingPaused = false;
+  var messageHandler = null;
   
   /**
    * Returns document's id
    */
-  function getDocumentId() {
-    return documentId;
+  function getDocumentId(editor) {
+    return editor.ckc.documentId;
   }
   
   /**
    * Updates document's id
    */
-  function updateDocumentId(aDocumentId) {
-    documentId = aDocumentId;
+  function updateDocumentId(editor, documentId) {
+    editor.ckc.documentId = documentId;
   }
   
   /**
    * Returns last saved revision number
    */
-  function getSavedRevision() {
-    return savedRevision;
+  function getSavedRevision(editor) {
+    return editor.ckc.savedRevision;
   }
   
   /**
    * Updates last saved revision number
    */
-  function updateSavedRevision(revision) {
-    savedRevision = revision;
+  function updateSavedRevision(editor, savedRevision) {
+    editor.ckc.savedRevision = savedRevision;
   }
   
   /**
    * Returns last saved content
    */
-  function getSavedContent() {
-    return savedContent;
+  function getSavedContent(editor) {
+    return editor.ckc.savedContent;
   }
   
   /**
    * Updates last saved content
    */
-  function updateSavedContent(content) {
-    savedContent = content;
+  function updateSavedContent(editor, savedContent) {
+    editor.ckc.savedContent = savedContent;
+  }
+
+  /**
+   * Returns last saved properties
+   */
+  function getSavedProperties(editor) {
+    return editor.ckc.savedProperties; 
+  }
+  
+  /**
+   * Updates saved properties
+   */
+  function updateSavedProperties(editor, savedProperties) {
+    editor.ckc.savedProperties = savedProperties; 
   }
   
   /**
@@ -431,13 +438,33 @@
       return editor.loadSnapshot(content);
     }
   }
-
-  function getSavedProperties() {
-    return savedProperties; 
+  
+  /**
+   * Returns access token
+   */
+  function getToken(editor) {
+    return editor.ckc.token;
   }
   
-  function updateSavedProperties(properties) {
-    savedProperties = properties; 
+  /**
+   * Sets access token
+   */
+  function setToken(editor, token) {
+    editor.ckc.token = token;
+  }
+  
+  /**
+   * Returns whether polling is paused or not
+   */
+  function getPollingPaused(editor) {
+    return editor.ckc.pollingPaused;
+  }
+  
+  /**
+   * Sets polling polling to pause or resumes polling
+   */
+  function setPollingPaused(editor, pollingPaused) {
+    editor.ckc.pollingPaused = pollingPaused;
   }
   
   function getCurrentProperties(editor) {
@@ -458,18 +485,8 @@
     }
   }
   
-  /**
-   * Returns access token
-   */
-  function getToken() {
-    return token;
-  }
-  
-  /**
-   * Sets access token
-   */
-  function setToken(aToken) {
-    token = aToken;
+  function isExistingInstance(editor) {
+    return CKEDITOR.instances[editor.name] != undefined;
   }
   
   /**
@@ -505,7 +522,7 @@
      * @param data request data (raw)
      * @param callback method to be executed after the call. 
      */
-    _doPost: function (url, data, callback) {
+    _doPost: function (editor, url, data, callback) {
       var xhr = this.createXMLHttpRequest();
       xhr.open("POST", url, true);
       xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
@@ -516,13 +533,15 @@
         xhr.setRequestHeader("Connection", "close");
       }
       
-      if (getToken())
-        xhr.setRequestHeader("Authorization", "token " + getToken());
+      var token = getToken(editor);
+      
+      if (token)
+        xhr.setRequestHeader("Authorization", "token " + token);
       
       xhr.onreadystatechange = function() { 
         if(xhr.readyState == 4) {
           if (xhr.status == 200) {
-            if (instanceDestroyed == true)
+            if (!isExistingInstance(editor))
               return;
             
             var response = xhr.responseText;
@@ -567,14 +586,14 @@
      * @param callback method to be called when request is done
      */
     init: function (editor, callback) {
-      var id = getDocumentId();
+      var id = getDocumentId(editor);
       
-      this._doPost(connectorUrl + '?action=INIT&documentId=' + id, null, function (success, responseJson) {
+      this._doPost(editor, connectorUrl + '?action=INIT&documentId=' + id, null, function (success, responseJson) {
         if (!success) {
           displayMessage('SEVERE', lang.initializationError);
         } else {
           if (responseJson.status == "OK") {
-            setToken(responseJson.token);
+            setToken(editor, responseJson.token);
             
             if ((typeof callback) == 'function') {
               callback();
@@ -594,16 +613,16 @@
         properties: properties
       }) !== true) {
         var data = "content=" + encodeURIComponent(content) + '&properties=' + encodeURIComponent(hashSerialize(properties));
-        this._doPost(connectorUrl + "?action=CREATE", data, function (success, responseJson) {
+        this._doPost(editor, connectorUrl + "?action=CREATE", data, function (success, responseJson) {
           if (!success) {
             displayMessage('SEVERE', lang.documentCreateError);
           } else {        
             switch (responseJson.status) {
               case "OK":
-                updateSavedContent(content);
-                updateDocumentId(responseJson.documentId);
-                updateSavedRevision(responseJson.revisionNumber);
-                setToken(responseJson.token);
+                updateSavedContent(editor, content);
+                updateDocumentId(editor, responseJson.documentId);
+                updateSavedRevision(editor, responseJson.revisionNumber);
+                setToken(editor, responseJson.token);
                 
                 editor.fire("ckcDocumentCreated", {
                   content: content,
@@ -629,9 +648,9 @@
      * @param callback method to be called when request is done
      */
     checkUpdates: function (editor, callback) {
-      var id = getDocumentId();
+      var id = getDocumentId(editor);
       
-      this._doPost(connectorUrl + '?action=UPDATE&documentId=' + id + "&revisionNumber=" + getSavedRevision(), null, function (success, responseJson) {
+      this._doPost(editor, connectorUrl + '?action=UPDATE&documentId=' + id + "&revisionNumber=" + getSavedRevision(editor), null, function (success, responseJson) {
         if (!success) {
           displayMessage('SEVERE', responseJson.errorMessage);
           if ((typeof callback) == 'function') {
@@ -643,7 +662,7 @@
               var revisions = responseJson.revisions;
               if (revisions && revisions.length > 0) {
                 var text = getCurrentContent(editor);
-                var revisionNumber = getSavedRevision();
+                var revisionNumber = getSavedRevision(editor);
                 var patchedText = text;
                 var conflict = false;
                 
@@ -670,7 +689,7 @@
                       });
                     }
                     
-                    updateSavedProperties(getCurrentProperties(editor));
+                    updateSavedProperties(editor, getCurrentProperties(editor));
                     
                     editor.fire('ckcPropertiesChanged', {
                       changedProperties: changedProperties,
@@ -682,10 +701,10 @@
                 }
                 
                 if (conflict == false) {
-                  updateSavedRevision(revisionNumber);
+                  updateSavedRevision(editor, revisionNumber);
     
                   if (patchedText !== text) {
-                    updateSavedContent(patchedText);
+                    updateSavedContent(editor, patchedText);
                     updateCurrentContent(editor, patchedText);
                     editor.fire('ckcContentChanged', {
                       source: "remote"
@@ -719,17 +738,17 @@
     saveChanges: function (editor, callback) {
       var contentDirty = editor.checkDirty();
       var properties = getCurrentProperties(editor);
-      var propertiesDirty = !hashCompare(properties, getSavedProperties());
+      var propertiesDirty = !hashCompare(properties, getSavedProperties(editor));
       var snapshot = null;
       var original = null;
       var propertiesDiff = null;
       
       if (contentDirty||propertiesDirty) {
-        var id = getDocumentId();
+        var id = getDocumentId(editor);
         var data = '';
         
         if (contentDirty) {
-          original = getSavedContent();
+          original = getSavedContent(editor);
           snapshot = getCurrentContent(editor);
           if (original != snapshot) {
             var diff = makeDiff(original, snapshot);
@@ -741,7 +760,7 @@
         }
         
         if (propertiesDirty) {
-          propertiesDiff = hashDiff(properties, getSavedProperties());
+          propertiesDiff = hashDiff(properties, getSavedProperties(editor));
           var propertiesPatch = hashSerialize(propertiesDiff);
           data = (data ? data + '&' : '') + 'properties=' + encodeURIComponent(propertiesPatch);
         }
@@ -755,7 +774,7 @@
               content: snapshot
             }) === true) {
               cancelled = true;
-              updateCurrentContent(editor, getSavedContent());
+              updateCurrentContent(editor, getSavedContent(editor));
             }
           }
           
@@ -765,7 +784,7 @@
               properties: properties
             }) === true) {
               cancelled = true;
-              var oldProperties = getSavedProperties();
+              var oldProperties = getSavedProperties(editor);
               for (var propertyName in oldProperties) {
                 updateCurrentProperty(editor, propertyName, oldProperties[propertyName]);
               }
@@ -773,7 +792,7 @@
           }
           
           if (cancelled == false) {
-            this._doPost(connectorUrl + '?action=SAVE&documentId=' + id + "&revision=" + getSavedRevision(), data, function (success, responseJson) {
+            this._doPost(editor, connectorUrl + '?action=SAVE&documentId=' + id + "&revision=" + getSavedRevision(editor), data, function (success, responseJson) {
               if (!success) {
                 displayMessage('SEVERE', responseJson.errorMessage);
                 if ((typeof callback) == 'function') {
@@ -784,14 +803,14 @@
                   case "OK":
                     if (responseJson.revisionNumber) {
                       if (contentDirty) {
-                        updateSavedContent(snapshot);
+                        updateSavedContent(editor, snapshot);
                         editor.fire('ckcContentChanged', {
                           source: "local"
                         });
                       }
                       
                       if (propertiesDirty) {
-                        updateSavedProperties(properties);
+                        updateSavedProperties(editor, properties);
                         
                         var changedProperties = new Array();
                         
@@ -807,7 +826,7 @@
                           source: "local"
                         });
                       }
-                      updateSavedRevision(responseJson.revisionNumber);
+                      updateSavedRevision(editor, responseJson.revisionNumber);
                     }
                   break;
                   case "CONFLICT":
@@ -840,18 +859,18 @@
       }
     },
     loadDocument: function (editor, callback) {
-      var id = getDocumentId();
+      var id = getDocumentId(editor);
       
-      this._doPost(connectorUrl + '?action=LOAD&documentId=' + id, null, function (success, responseJson) {
+      this._doPost(editor, connectorUrl + '?action=LOAD&documentId=' + id, null, function (success, responseJson) {
         if (!success) {
           displayMessage('SEVERE', responseJson.errorMessage);
           if ((typeof callback) == 'function') {
             callback();
           }
         } else {
-          if (getSavedContent() != responseJson.content) {
+          if (getSavedContent(editor) != responseJson.content) {
             updateCurrentContent(editor, responseJson.content);
-            updateSavedContent(responseJson.content);
+            updateSavedContent(editor, responseJson.content);
             editor.fire('ckcContentChanged', {
               source: "remote"
             });
@@ -868,7 +887,7 @@
               });
             }
   
-            updateSavedProperties(getCurrentProperties(editor));
+            updateSavedProperties(editor, getCurrentProperties(editor));
             
             editor.fire('ckcPropertiesChanged', {
               changedProperties: changedProperties,
@@ -876,7 +895,7 @@
             });
           }
           
-          updateSavedRevision(responseJson.revisionNumber);
+          updateSavedRevision(editor, responseJson.revisionNumber);
           
           if ((typeof callback) == 'function') {
             callback();
@@ -1003,7 +1022,7 @@
    * Saves editor's content
    */
   function save(editor, callback) {
-    if (getDocumentId()) {
+    if (getDocumentId(editor)) {
       CKCConnector.checkUpdates(editor, function () {
         CKCConnector.saveChanges(editor, callback);
       });
@@ -1019,9 +1038,9 @@
   }
   
   function revert(editor) {
-    pollingPaused = true;
+    setPollingPaused(editor, true);
     CKCConnector.loadDocument(editor, function () {
-      pollingPaused = false;
+      setPollingPaused(editor, false);
     });
   }
   
@@ -1030,9 +1049,9 @@
    */
   function checkUpdates(editor) {
     CKEDITOR.tools.setTimeout(function () {
-      if (instanceDestroyed == false) {
+      if (isExistingInstance(editor)) {
         if (editor.mode == 'wysiwyg') {
-          if (pollingPaused == false) {
+          if (getPollingPaused(editor) == false) {
             save(editor, function () {
               checkUpdates(editor);
             });
@@ -1049,8 +1068,8 @@
    */  
   function checkUnsaved(editor) {
     CKEDITOR.tools.setTimeout(function () {
-      if (instanceDestroyed == false) {
-        if (!getDocumentId()) {
+      if (isExistingInstance(editor)) {
+        if (!getDocumentId(editor)) {
           displayMessage('WARNING', lang.unsavedDocumentWarning);
           checkUnsaved(editor);
         }
@@ -1068,12 +1087,21 @@
       lang = editor.lang.ckc;
       
       editor.on( 'instanceReady', function() {
+        editor.ckc = {
+          documentId : null,
+          savedRevision : null,
+          savedContent : null,
+          savedProperties : null,
+          token : null,
+          pollingPaused: false
+        };
+
         CKEDITOR.scriptLoader.load( editor.plugins.ckc.path + 'required/diff_match_patch.js' , function () {
           diffMatchPatch = new diff_match_patch();
           connectorUrl = editor.config.ckc.connectorUrl;
           messageHandler = editor.config.ckc.messageHandler;
-          
-          updateDocumentId(editor.config.ckc.documentId);
+         
+          updateDocumentId(editor, editor.config.ckc.documentId);
 
           editor.addCommand('ckcsave', {
             exec : function(editor) {
@@ -1091,11 +1119,7 @@
             }
           });
           
-          editor.on("destroy", function (e) {
-            instanceDestroyed = true;
-          });
-          
-          if (getDocumentId()) {
+          if (getDocumentId(editor)) {
             CKCConnector.init(editor, function () {
               CKCConnector.loadDocument(editor, function () {
                 checkUpdates(editor);
