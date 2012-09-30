@@ -625,6 +625,8 @@
                 setToken(editor, responseJson.token);
                 
                 editor.fire("ckcDocumentCreated", {
+                  documentId: responseJson.documentId,
+                  revisionNumber: responseJson.revisionNumber,
                   content: content,
                   properties: properties
                 });
@@ -692,6 +694,8 @@
                     updateSavedProperties(editor, getCurrentProperties(editor));
                     
                     editor.fire('ckcPropertiesChanged', {
+                      documentId: id,
+                      revisionNumber: revision.number,
                       changedProperties: changedProperties,
                       source: "remote"
                     });
@@ -707,6 +711,8 @@
                     updateSavedContent(editor, patchedText);
                     updateCurrentContent(editor, patchedText);
                     editor.fire('ckcContentChanged', {
+                      documentId: id,
+                      revisionNumber: revisionNumber,
                       source: "remote"
                     });
                   }
@@ -766,10 +772,13 @@
         }
         
         if (contentDirty||propertiesDirty) {
+          var savedRevision = getSavedRevision(editor);
           var cancelled = false;
           
           if (contentDirty) {
             if (editor.fire('ckcContentChange', {
+              documentId: id,
+              revisionNumber: savedRevision,
               source: "local",
               content: snapshot
             }) === true) {
@@ -780,6 +789,8 @@
           
           if (propertiesDirty) {
             if (editor.fire('ckcPropertiesChange', {
+              documentId: id,
+              revisionNumber: savedRevision,
               source: "local",
               properties: properties
             }) === true) {
@@ -792,7 +803,7 @@
           }
           
           if (cancelled == false) {
-            this._doPost(editor, connectorUrl + '?action=SAVE&documentId=' + id + "&revision=" + getSavedRevision(editor), data, function (success, responseJson) {
+            this._doPost(editor, connectorUrl + '?action=SAVE&documentId=' + id + "&revision=" + savedRevision, data, function (success, responseJson) {
               if (!success) {
                 displayMessage('SEVERE', responseJson.errorMessage);
                 if ((typeof callback) == 'function') {
@@ -805,6 +816,8 @@
                       if (contentDirty) {
                         updateSavedContent(editor, snapshot);
                         editor.fire('ckcContentChanged', {
+                          documentId: id,
+                          revisionNumber: responseJson.revisionNumber,
                           source: "local"
                         });
                       }
@@ -822,6 +835,8 @@
                         }
                         
                         editor.fire('ckcPropertiesChanged', {
+                          documentId: id,
+                          revisionNumber: responseJson.revisionNumber,
                           changedProperties: changedProperties,
                           source: "local"
                         });
@@ -868,10 +883,14 @@
             callback();
           }
         } else {
+          var revisionNumber = responseJson.revisionNumber; 
+          
           if (getSavedContent(editor) != responseJson.content) {
             updateCurrentContent(editor, responseJson.content);
             updateSavedContent(editor, responseJson.content);
             editor.fire('ckcContentChanged', {
+              documentId: id,
+              revisionNumber: revisionNumber,
               source: "remote"
             });
           }
@@ -890,12 +909,14 @@
             updateSavedProperties(editor, getCurrentProperties(editor));
             
             editor.fire('ckcPropertiesChanged', {
+              documentId: id,
+              revisionNumber: revisionNumber,
               changedProperties: changedProperties,
               source: "remote"
             });
           }
           
-          updateSavedRevision(editor, responseJson.revisionNumber);
+          updateSavedRevision(editor, revisionNumber);
           
           if ((typeof callback) == 'function') {
             callback();
